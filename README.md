@@ -80,3 +80,31 @@ contrato publicado no enunciado.
 - não altere os números e nomes de `TokenKind`;
 - preserve as assinaturas e os campos públicos fornecidos; e
 - verifique se o último commit está no repositório correto do grupo.
+
+---
+
+## Implementação do grupo
+
+A estratégia escolhida foi a **mista** (enunciado, seção 5): um autômato dirigido
+por tabela reconhece identificadores, inteiros, operadores e delimitadores
+aplicando a regra do maior prefixo, enquanto rotinas manuais cuidam de espaços,
+comentários e strings — porque cada erro dessas categorias deve ser reportado
+numa posição que não é a posição corrente do autômato.
+
+| Arquivo | Responsabilidade |
+|---|---|
+| [`microc_cursor.py`](microc_cursor.py) | Navega o texto-fonte e rastreia linha e coluna. Sem dependências. |
+| [`microc_automato.py`](microc_automato.py) | Estados, classificação de caracteres e tabela de transições. Sem dependências, e deliberadamente sem conhecer `TokenKind` — o que evita import circular com `Lexer.py`. |
+| [`Lexer.py`](Lexer.py) | Contrato público (inalterado) mais a orquestração, as rotinas manuais e o maior prefixo. |
+
+Documentação:
+
+- [`docs/IMPLEMENTACAO.md`](docs/IMPLEMENTACAO.md) — guia de leitura do código:
+  onde cada coisa mora e como as peças se encaixam.
+- [`docs/superpowers/specs/2026-08-20-lexer-microc-design.md`](docs/superpowers/specs/2026-08-20-lexer-microc-design.md)
+  — documento de design, com o racional de cada decisão.
+
+Rodando no Windows, exporte `PYTHONUTF8=1` antes do `pytest`: sem isso, o teste
+do runner que compara a mensagem acentuada `erro léxico` pode falhar por
+descasamento de codificação entre o processo pai e o filho, sem que haja
+problema no lexer. Detalhes em `docs/IMPLEMENTACAO.md`.

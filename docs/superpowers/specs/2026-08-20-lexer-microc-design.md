@@ -130,10 +130,16 @@ tem transição — exatamente a semântica desejada.
 **O Cursor não tem `voltar()`.** Isso é intencional e a seção 6.2 explica como o munch
 máximo funciona sem retrocesso de cursor.
 
-**Sobre `\r`:** tratado como espaço em branco descartável, avançando coluna sem trocar
-de linha. Na prática ele nunca chega aqui — `runner.py` lê em modo texto e o Python
-normaliza `\r\n` para `\n`. A regra existe para quem construir `Lexer(...)` direto com
-uma string lida de outra forma no Windows.
+**Sobre `\r`: nenhum tratamento especial.** O enunciado nunca menciona `\r`. Ele diz
+apenas que "o runner lê arquivos em modo texto, normalizando as terminações de linha
+usuais" (seção 2.3) — ou seja, `\r\n` já virou `\n` antes de o lexer ver qualquer
+coisa. Como a seção 3.2 lista os descartáveis como "espaços, tabulações e quebras de
+linha", e a seção 3.4 declara que "caractere que não inicia token" é erro léxico, a
+leitura literal da especificação é que um `\r` avulso é **erro**, não espaço em branco.
+
+É o que fazemos: ele não entra na lista de ignoráveis, cai no autômato, não encontra
+transição e vira `LexerError`. Não implementamos comportamento que a especificação não
+pede — inventar tolerância aqui seria divergir do contrato por conta própria.
 
 ## 5. `microc_automato.py` — a tabela
 
@@ -333,7 +339,7 @@ Um único laço, porque as três coisas se alternam livremente
 
 ```
 repita:
-    espaço, tab, \n ou \r      → consome, continua
+    espaço, tab ou \n          → consome, continua
     '/' seguido de '/'         → consome até \n (exclusive) ou fim, validando
                                  ASCII de cada caractere; continua
     '/' seguido de '*'         → consome bloco (abaixo), continua
@@ -405,7 +411,7 @@ mensagem é livre; a **classe e a posição** é que são verificadas.
 
 | Situação | Posição |
 |---|---|
-| Caractere que não inicia token (`@`) | o caractere |
+| Caractere que não inicia token (`@`, e também `\r` avulso) | o caractere |
 | Caractere não ASCII (`é`), inclusive em comentário | o caractere |
 | `&` ou `|` isolados | o caractere |
 | Escape inválido em string | a **barra invertida** |
@@ -422,8 +428,14 @@ Não precisamos fazer nada de especial — só não capturar a exceção no cami
 
 **Alvo primário:** os 13 testes públicos de `tests/test.py`, que não serão alterados.
 
-**Testes próprios:** um arquivo novo `tests/test_extras.py` (o `pyproject.toml` já
-coleta `test_*.py`) cobrindo casos que os públicos não exercitam mas os ocultos podem:
+**Testes próprios: fora do repositório.** A pasta `tests/` fica exatamente como veio no
+starter, com `tests/test.py` e nada mais — decisão do grupo, para o repositório entregue
+não carregar arquivo que o enunciado não pediu.
+
+Ainda assim precisamos de rede de segurança, porque a correção usa testes ocultos além
+dos públicos. Os casos abaixo ficam num arquivo mantido **na área temporária da sessão**
+(fora da árvore do git, nunca versionado) e são rodados durante o desenvolvimento
+apontando para o pacote do repositório:
 
 - `Cursor` isolado — linha/coluna após tabulação, `\n`, sequências mistas
 - `microc_automato` isolado — transições e conjunto de aceitadores
@@ -433,6 +445,7 @@ coleta `test_*.py`) cobrindo casos que os públicos não exercitam mas os oculto
 - todas as palavras reservadas, e cada uma com sufixo (`ifx`, `elsee`)
 - inteiro maior que 2⁶³−1
 - todos os operadores e delimitadores, um a um
+- `\r` avulso produzindo `LexerError` na posição correta
 
 **Método:** TDD. Para cada comportamento, rodar o teste que falha, implementar o
 mínimo, ver passar. Os testes públicos já falham hoje com `NotImplementedError` — eles

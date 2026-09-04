@@ -89,6 +89,8 @@ class Token:
         return (
             f"<{self.kind.value}, {self.kind.name}, {self.lexeme!r}, "
             f"{self.value!r}, {self.line}, {self.column}>"
+            # <numero, NOME, repr(lexeme), repr(value), linha, coluna>
+            # exigido pelo enunciado (§6) é montado — !r no f-string chama repr() automaticamente.
         )
 
 
@@ -208,6 +210,10 @@ class Lexer:
 
     def scan(self) -> list[Token]:
         return list(self.tokens())
+        # scan() é só um atalho: list(...) sobre o gerador, consumindo tudo de uma vez
+        # Importante: se alguma chamada levantar LexerError no meio, o list() propaga 
+        # a exceção sem devolver nada — não existe uma lista parcial "vazando" para 
+        # quem chamou. É isso que garante "erros não deixam tokens parciais"(item 6).
 
     # ------------------------------------------------------------------
     # Núcleo dirigido por tabela
@@ -215,9 +221,11 @@ class Lexer:
 
     def _rodar_automato(self) -> Token:
         """Reconhece o maior prefixo válido a partir da posição corrente.
-
+        BACKTRAKING :
         O algoritmo clássico consome caracteres e **retrocede** o cursor quando
-        trava. Aqui fazemos o inverso: olhamos adiante com ``espiar(n)`` sem
+        trava. 
+        
+        Aqui fazemos o inverso: olhamos adiante com ``espiar(n)`` sem
         consumir nada, memorizando o último estado aceitador visitado, e só no
         final consumimos exatamente o tanto que foi aceito. Assim o cursor nunca
         precisa desfazer contagem de linha e coluna.
@@ -260,9 +268,7 @@ class Lexer:
         lexema = "".join(self._cursor.avancar() for _ in range(tamanho_aceito))
         return self._montar_token(ultimo_aceitador, lexema, linha, coluna)
 
-    def _montar_token(
-        self, estado: Estado, lexema: str, linha: int, coluna: int
-    ) -> Token:
+    def _montar_token(self, estado: Estado, lexema: str, linha: int, coluna: int) -> Token:
         """Traduz estado final + lexema no ``Token`` público."""
         tipo = ESTADO_PARA_TIPO[estado]
 
@@ -278,6 +284,9 @@ class Lexer:
             # int() aceita zeros à esquerda em decimal: "0042" -> 42. Os zeros
             # sobrevivem apenas no lexema, como pede a seção 2.2. Não há limite
             # de magnitude nesta etapa — validar 2**63-1 cabe à semântica.
+            # o Python já lida com zero à esquerda
+            # em base 10 sem precisar de tratamento manual; os zeros continuam existindo 
+            # no lexema, só não no value.
             valor = int(lexema)
         elif tipo is TokenKind.KW_TRUE:
             valor = True
@@ -287,7 +296,8 @@ class Lexer:
             valor = None
 
         return Token(tipo, lexema, valor, linha, coluna)
-
+    # BONUS implementa uma mensagem para identificar o tipo de erro léxico, 
+    # para que o usuário saiba o que está errado no código fonte.
     def _descrever_caractere_invalido(self) -> str:
         """Mensagem do erro léxico para o caractere na posição corrente."""
         caractere = self._cursor.espiar()
